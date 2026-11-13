@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "glideway-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "vars": { "OSRM_URL": "https://reassure-shy-lunacy.ngrok-free.dev,https://router.project-osrm.org,https://routing.openstreetmap.de/routed-car" },
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" }
+}
