@@ -47,11 +47,20 @@ Coverage is currently **Gujarat, India** only (see `src/lib/region.ts`).
 | **Better Roads** | Smoothest surfaces, highest share of well-maintained roads |
 | **Night-Safe** | Highest share of lit roads; auto-enabled after 9 PM and before 5 AM |
 
+- **Turn-by-turn directions** for every route, with a step list and manoeuvre icons
+- **Live navigation:** GPS-following, heading-up 3D camera, next-turn banner, ETA and remaining distance, voice guidance, screen wake lock, and automatic rerouting when you leave the route
+- **Use my location** as the starting point, with a live position dot on the map
+- **Multi-stop routes:** up to 3 intermediate stops, scored per leg and joined for each mode
+- **Light, dark and auto map themes**, plus a night mode that keeps the map dark and recommends Night-Safe
+- **Installable PWA** with an offline app shell, cached map data and last-known routes
+- **Route caching** in memory and on the Cloudflare edge for repeat requests
 - Place search with autocomplete (Photon geocoder), swap and demo-route shortcuts
 - Per-route metrics: duration, distance, signal count, % smooth, % lit
-- Shareable URLs (`/app?from=lng,lat&to=lng,lat&mode=…`) and native share on mobile
+- Shareable URLs (`/app?from=lng,lat&to=lng,lat&via=lng,lat;lng,lat&mode=…`) and native share on mobile
 - Responsive layout: side panel on desktop, draggable bottom sheet on phones
 - Honest data handling: where OSM tags are missing, values are estimated from road class and the UI says so
+
+> **Simulated drive:** use **Preview** next to *Start navigation* to replay a route without moving. Real navigation needs HTTPS and location permission.
 
 ## Tech stack
 
@@ -98,14 +107,16 @@ For the deployed Worker, `OSRM_URL` is set under `vars` in `wrangler.jsonc`.
 
 ## How routing works
 
-The engine lives in `src/lib/routingEngine.ts`.
+The engine lives in `src/lib/routing/` (`osrm.ts` candidates and steps, `overpass.ts` road data, `scoring.ts` metrics and modes, `merge.ts` multi-stop joining).
 
-1. **Candidates.** OSRM returns up to three alternatives. If fewer than four distinct paths exist, detours via perpendicular waypoints are added.
+1. **Candidates.** For each leg, OSRM returns up to three alternatives with turn-by-turn steps. If fewer than four distinct paths exist, detours via perpendicular waypoints are added. With stops, each leg is routed and scored on its own, then the legs are joined per mode.
 2. **Road data.** Traffic signals (`highway=traffic_signals`) and road ways (`lit`, `surface`, `smoothness`, `bridge`) near the candidates are loaded from the local OSM extract. If it is unavailable, for example on Workers, one Overpass query over the route bounding box is used, racing all configured mirrors.
 3. **Scoring.** Each route is sampled every 40 m. Signals within 20 m are counted (merged within 30 m), and `lit`/`surface` are matched to the nearest way. Missing tags are estimated from road class.
 4. **Mode assignment.** Modes are chosen from weighted, min-max normalised scores, preferring distinct paths when they are nearly as good.
 
-The `/api/route` response includes a `source` field:
+`GET /api/route?from=lng,lat&to=lng,lat[&via=lng,lat;lng,lat]` accepts up to 3 `via` stops. Live results are cached for 10 minutes (memory, then the Cloudflare edge cache) and reported in the `X-Route-Cache` header.
+
+The response includes a `source` field:
 
 | `source` | Meaning |
 | --- | --- |
@@ -136,14 +147,25 @@ src/
     page.tsx            Landing page
     app/                Map application (AppClient.tsx)
     api/route/route.ts  Routing endpoint
+    manifest.ts         PWA manifest
   components/
     landing/            Hero, problem contrast, route showcase, tech flow
-    map/                MapCanvas, RouteSidebar, NightModeToggle
+    map/                MapCanvas (basemap, routes, markers, navigation camera)
+    planner/            RouteSidebar, PlaceInput, RouteCard, DirectionsList, toggles
+    nav/                NavigationOverlay (turn banner, ETA bar)
+    pwa/                Service worker registration
+    ui/                 Shared UI (ManeuverIcon)
+  hooks/                useGeolocation, useNavigation, useTheme, usePwaInstall, useMediaQuery
   lib/
-    routingEngine.ts    Candidate generation, scoring, mode assignment
+    routing/            OSRM, Overpass, scoring, multi-stop merge
+    server/             Route cache (memory + edge)
+    navigation.ts       Snap to route, progress, ETA, off-route detection
+    directions.ts       Instruction text, icons, distance and time formatting
+    shareUrl.ts         Encode and decode shareable URLs
     localOsm.ts         Local OSM tile reader
     photon.ts           Geocoding client
     region.ts           Gujarat bounds and checks
+public/                 sw.js (service worker), offline.html, icons
 scripts/                OSM tile builder, MapLibre worker copy
 ```
 
@@ -158,9 +180,21 @@ npm run deploy
 
 Because Workers have no local filesystem for OSM tiles, production routing uses Overpass for road data and a hosted OSRM endpoint (configured in `wrangler.jsonc`).
 
+## Progressive web app
+
+GlideWay is installable (Chrome, Edge and Android show an install button in the app; on iOS use Share, then Add to Home Screen). The service worker in `public/sw.js` is registered in production only and:
+
+- caches the app shell and static assets, with an offline page for uncached navigations
+- caches CARTO basemap styles and tiles (stale-while-revalidate, capped)
+- serves the last successful `/api/route` response when offline
+
+Bump `VERSION` in `public/sw.js` to invalidate old caches.
+
 ## Limitations
 
 - Coverage is limited to Gujarat; points outside it are rejected.
+- Voice guidance uses the browser's speech engine, so voices vary by device. Navigation needs a screen that stays on; browsers pause location updates in the background.
+- Navigation instructions come from OSRM manoeuvres and carry no live traffic or lane guidance.
 - Public OSRM, Overpass and Photon servers are for light and demo use. Self-host them before serving real traffic.
 - Lighting and smoothness depend on OSM tagging quality, which varies by area.
 
