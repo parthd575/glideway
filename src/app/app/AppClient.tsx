@@ -43,15 +43,14 @@ export default function AppClient() {
   const [voice, setVoice] = useState(true);
   const isMobile = useMediaQuery("(max-width: 767px)");
   const hadModeParam = useRef(isMode(sp.get("mode")));
-  const theme = useTheme();
   const install = usePwaInstall();
   const geo = useGeolocation(showMe && !navigating);
 
+  const theme = useTheme(night);
   const readyStops = useMemo(() => filled(stops), [stops]);
   const stopsKey = readyStops.map((s) => `${s.lng},${s.lat}`).join(";");
   const pendingStop = stops.some((s) => !s); // an empty row is waiting to be filled in
-  // Night mode always uses the dark map
-  const effectiveTheme: "light" | "dark" = night ? "dark" : theme.resolved;
+  const effectiveTheme = theme.resolved;
 
   // Visiting after 9 PM (or before 5 AM) turns night mode on automatically
   useEffect(() => {

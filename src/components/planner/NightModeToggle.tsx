@@ -12,7 +12,7 @@ export default function NightModeToggle({ night, auto, onChange }: { night: bool
         <Moon size={16} className={night ? "text-amber-400" : "text-dim"} />
         <span>
           <span className="block text-sm font-medium">Night mode</span>
-          <span className="block text-xs text-dim">{auto && night ? "It's late — turned on automatically" : "Dark map, highlights the Night-Safe route"}</span>
+          <span className="block text-xs text-dim">{auto && night ? "It's late — turned on automatically" : "Amber tint, recommends the Night-Safe route"}</span>
         </span>
       </span>
       <span className={`relative h-5 w-9 rounded-full transition ${night ? "bg-amber-500" : "bg-dim"}`}>

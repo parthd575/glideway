@@ -51,7 +51,7 @@ Coverage is currently **Gujarat, India** only (see `src/lib/region.ts`).
 - **Live navigation:** GPS-following, heading-up 3D camera, next-turn banner, ETA and remaining distance, voice guidance, screen wake lock, and automatic rerouting when you leave the route
 - **Use my location** as the starting point, with a live position dot on the map
 - **Multi-stop routes:** up to 3 intermediate stops, scored per leg and joined for each mode
-- **Light, dark and auto map themes**, plus a night mode that keeps the map dark and recommends Night-Safe
+- **Light, dark and auto map themes** (auto is light by day and dark when night mode is on), plus a night mode that adds an amber tint and recommends Night-Safe
 - **Installable PWA** with an offline app shell, cached map data and last-known routes
 - **Route caching** in memory and on the Cloudflare edge for repeat requests
 - Place search with autocomplete (Photon geocoder), swap and demo-route shortcuts

@@ -67,7 +67,7 @@ export default function RouteSidebar(p: Props) {
         <Link href="/" className="text-lg font-bold tracking-tight">Glide<span className="text-emerald-500">Way</span></Link>
         <div className="flex items-center gap-1.5">
           {p.canInstall && <button onClick={p.onInstall} aria-label="Install app" title="Install GlideWay" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-soft transition hover:bg-line"><Download size={14} /></button>}
-          <ThemeToggle value={p.theme} onChange={p.setTheme} forcedDark={p.night} />
+          <ThemeToggle value={p.theme} onChange={p.setTheme} />
           <button onClick={share} disabled={!routes} className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs text-soft transition hover:bg-line disabled:opacity-40">{copied ? <Check size={13} className="text-emerald-500" /> : <Link2 size={13} />}{copied ? "Copied" : "Share"}</button>
         </div>
       </div>

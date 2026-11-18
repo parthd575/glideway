@@ -144,7 +144,7 @@ export default function MapCanvas({ routes, active, from, to, stops, night, them
         {from && !navigating && <Marker longitude={from.lng} latitude={from.lat}><div className="h-4 w-4 rounded-full border-4 border-emerald-400 bg-white shadow-lg" /></Marker>}
         {to && <Marker longitude={to.lng} latitude={to.lat}><div className="h-5 w-5 rounded-full border-4 border-white bg-red-500 shadow-lg" /></Marker>}
       </Map>
-      <div className={`pointer-events-none absolute inset-0 transition-opacity duration-1000 ${night && theme === "dark" ? "opacity-100" : "opacity-0"}`} style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(120,53,15,0.35) 100%)", mixBlendMode: "multiply" }} />
+      <div className={`pointer-events-none absolute inset-0 transition-opacity duration-1000 ${night ? "opacity-100" : "opacity-0"}`} style={{ background: theme === "dark" ? "radial-gradient(ellipse at center, transparent 40%, rgba(120,53,15,0.35) 100%)" : "radial-gradient(ellipse at center, transparent 35%, rgba(245,158,11,0.28) 100%)", mixBlendMode: "multiply" }} />
     </div>
   );
 }
