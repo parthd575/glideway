@@ -9,10 +9,12 @@ import { searchPlaces } from "@/lib/photon";
 import type { Place, RouteResponse, ScoredRoute } from "@/lib/types";
 import NightModeToggle from "./NightModeToggle";
 
-function PlaceInput({ label, dot, value, onPick, bias }: { label: string; dot: string; value: Place | null; onPick: (p: Place | null) => void; bias?: { lat: number; lng: number } }) {
+function PlaceInput({ label, dot, value, onPick, bias, listMax }: { label: string; dot: string; value: Place | null; onPick: (p: Place | null) => void; bias?: { lat: number; lng: number }; listMax?: number }) {
   const [q, setQ] = useState(value?.label ?? "");
   const [results, setResults] = useState<Place[]>([]);
   const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const abort = useRef<AbortController>(undefined);
 
@@ -23,10 +25,13 @@ function PlaceInput({ label, dot, value, onPick, bias }: { label: string; dot: s
     if (value) onPick(null);
     clearTimeout(timer.current);
     abort.current?.abort();
-    if (v.trim().length < 2) { setResults([]); return; }
+    if (v.trim().length < 2) { setResults([]); setSearching(false); setSearched(false); setOpen(false); return; }
+    setSearching(true); setSearched(false); setOpen(true);
     timer.current = setTimeout(async () => {
-      abort.current = new AbortController();
-      try { setResults(await searchPlaces(v, bias, abort.current.signal)); setOpen(true); } catch { /* aborted or offline */ }
+      const ctrl = new AbortController();
+      abort.current = ctrl;
+      try { setResults(await searchPlaces(v, bias, ctrl.signal)); setSearched(true); } catch { /* aborted or offline */ }
+      finally { if (!ctrl.signal.aborted) setSearching(false); }
     }, 250);
   };
 
@@ -34,11 +39,14 @@ function PlaceInput({ label, dot, value, onPick, bias }: { label: string; dot: s
     <div className="relative">
       <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 focus-within:border-white/30">
         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: dot }} />
-        <input value={q} onChange={(e) => onChange(e.target.value)} onFocus={() => results.length && setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} placeholder={label} aria-label={label} className="w-full bg-transparent text-sm outline-none placeholder:text-gray-500" />
+        <input value={q} onChange={(e) => onChange(e.target.value)} onFocus={() => (results.length || searching) && setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} placeholder={label} aria-label={label} className="w-full bg-transparent text-sm outline-none placeholder:text-gray-500" />
+        {searching && <Loader2 size={14} className="shrink-0 animate-spin text-gray-400" aria-label="Searching" />}
       </div>
       <AnimatePresence>
-        {open && results.length > 0 && (
-          <motion.ul initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-white/10 bg-[#0f1523] shadow-2xl">
+        {open && (searching || searched || results.length > 0) && (
+          <motion.ul initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute z-30 mt-1 w-full overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#0f1523] shadow-2xl" style={{ maxHeight: listMax, touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}>
+            {searching && results.length === 0 && <li className="flex items-center gap-2 px-3 py-3 text-sm text-gray-400"><Loader2 size={14} className="animate-spin" /> Searching places…</li>}
+            {!searching && searched && results.length === 0 && <li className="px-3 py-3 text-sm text-gray-500">No places found in Gujarat.</li>}
             {results.map((r, i) => (
               <li key={i}>
                 <button onMouseDown={(e) => e.preventDefault()} onClick={() => { onPick(r); setOpen(false); }} className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-white/5">
@@ -96,11 +104,12 @@ export default function RouteSidebar(p: Props) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const [vh, setVh] = useState(800);
+  const [kb, setKb] = useState(0); // px covered by the on-screen keyboard (iOS overlays instead of resizing)
   const controls = useDragControls();
   const hasRoutes = !!p.data;
   // On phones, tuck the sheet down once routes arrive so the map is visible
   useEffect(() => { if (p.isMobile && hasRoutes) setExpanded(false); }, [p.isMobile, hasRoutes]);
-  useEffect(() => { const f = () => setVh(window.innerHeight); f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
+  useEffect(() => { const f = () => { const v = window.visualViewport; setVh(v?.height ?? window.innerHeight); setKb(v ? Math.max(0, Math.round(window.innerHeight - v.height - v.offsetTop)) : 0); }; f(); window.addEventListener("resize", f); window.visualViewport?.addEventListener("resize", f); return () => { window.removeEventListener("resize", f); window.visualViewport?.removeEventListener("resize", f); }; }, []);
 
   const share = async () => {
     const url = window.location.href;
@@ -113,16 +122,19 @@ export default function RouteSidebar(p: Props) {
   const routes = p.data?.routes;
   const fastest = routes?.find((r) => r.mode === "fastest");
 
+  // Keep the suggestion list inside the area left above the on-screen keyboard
+  const listMax = p.isMobile ? Math.max(120, Math.round(vh * 0.82) - 230) : 320;
+
   const body = (
-    <div className="flex h-full min-h-0 flex-col gap-3 p-4">
+    <div onFocusCapture={() => { if (p.isMobile) setExpanded(true); }} className="flex h-full min-h-0 flex-col gap-3 p-4">
       <div className="flex items-center justify-between">
         <Link href="/" className="text-lg font-bold tracking-tight">Glide<span className="text-emerald-400">Way</span></Link>
         <button onClick={share} disabled={!routes} className="flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-gray-300 transition hover:bg-white/10 disabled:opacity-40">{copied ? <Check size={13} className="text-emerald-400" /> : <Link2 size={13} />}{copied ? "Link copied" : "Share route"}</button>
       </div>
 
       <div className="relative space-y-2">
-        <PlaceInput label="Starting point" dot="#34d399" value={p.from} onPick={p.setFrom} />
-        <PlaceInput label="Destination" dot="#ef4444" value={p.to} onPick={p.setTo} bias={p.from ? { lat: p.from.lat, lng: p.from.lng } : undefined} />
+        <PlaceInput label="Starting point" dot="#34d399" value={p.from} onPick={p.setFrom} listMax={listMax} />
+        <PlaceInput label="Destination" dot="#ef4444" value={p.to} onPick={p.setTo} bias={p.from ? { lat: p.from.lat, lng: p.from.lng } : undefined} listMax={listMax} />
         <button onClick={p.onSwap} aria-label="Swap" className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/10 bg-[#0f1523] p-1.5 text-gray-400 hover:text-white"><ArrowDownUp size={13} /></button>
       </div>
 
@@ -161,7 +173,7 @@ export default function RouteSidebar(p: Props) {
       drag="y" dragControls={controls} dragListener={false} dragConstraints={{ top: 0, bottom: collapsedY }} dragElastic={0.08} dragMomentum={false}
       initial={{ y: collapsedY }} animate={{ y: expanded ? 0 : collapsedY }} transition={SPRING}
       onDragEnd={(_, i) => setExpanded(i.offset.y < 0 || i.velocity.y < -300 ? true : i.offset.y > 60 || i.velocity.y > 300 ? false : expanded)}
-      className="absolute inset-x-0 bottom-0 z-20 overflow-hidden rounded-t-3xl border border-white/10 bg-[#0b1020]/95 shadow-2xl backdrop-blur-xl" style={{ height: sheetH, touchAction: "none" }}
+      className="absolute inset-x-0 bottom-0 z-20 overflow-hidden rounded-t-3xl border border-white/10 bg-[#0b1020]/95 shadow-2xl backdrop-blur-xl" style={{ height: sheetH, bottom: kb, touchAction: "none" }}
     >
       <div onPointerDown={(e) => controls.start(e)} onClick={() => setExpanded((v) => !v)} className="flex cursor-grab justify-center pb-1 pt-2.5" style={{ touchAction: "none" }}><span className="h-1.5 w-10 rounded-full bg-white/25" /></div>
       <div style={{ height: sheetH - 22, touchAction: "pan-y" }}>{body}</div>
