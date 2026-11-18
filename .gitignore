@@ -49,3 +49,6 @@ next-env.d.ts
 /osrm
 /data
 *.osm.pbf
+
+# generated OSM tiles served as Worker assets
+/public/osm

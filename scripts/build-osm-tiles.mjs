@@ -4,15 +4,15 @@ import { createInterface } from "node:readline";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
-const TILE = 0.25;
+const TILE = 0.1; // keep in sync with src/lib/localOsm.ts
 const out = process.argv[2] ?? "data/osm-tiles";
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
-const KEEP = ["highway", "lit", "surface", "smoothness", "bridge", "layer"];
+const KEEP = ["highway", "lit", "surface", "smoothness", "bridge", "layer", "maxspeed"];
 const tiles = new Map();
 const tile = (k) => { let t = tiles.get(k); if (!t) tiles.set(k, (t = { s: [], w: [] })); return t; };
 const key = (x, y) => `${Math.floor(x / TILE)}_${Math.floor(y / TILE)}`;
-const r6 = (n) => Math.round(n * 1e6) / 1e6;
+const r6 = (n) => Math.round(n * 1e5) / 1e5; // ~1 m, plenty for 25 m matching
 let ns = 0, nw = 0;
 
 for await (const raw of createInterface({ input: process.stdin })) {

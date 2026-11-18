@@ -8,8 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "node scripts/copy-maplibre-worker.mjs",
-    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+    "osm:build": "bash scripts/build-osm-data.sh",
+    "osm:sync": "node scripts/sync-osm-assets.mjs",
+    "preview": "node scripts/sync-osm-assets.mjs && opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "node scripts/sync-osm-assets.mjs && opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "clsx": "^2.1.1",

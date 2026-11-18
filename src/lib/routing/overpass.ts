@@ -4,7 +4,7 @@ import { UA } from "./osrm";
 
 const OVERPASS = (process.env.OVERPASS_URLS ?? "https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter").split(",");
 
-export interface WayTags { highway?: string; lit?: string; surface?: string; smoothness?: string; bridge?: string; layer?: string }
+export interface WayTags { highway?: string; lit?: string; surface?: string; smoothness?: string; bridge?: string; layer?: string; maxspeed?: string }
 export interface OverpassData { signals: LngLat[]; grid: SegGrid<WayTags> }
 
 const cache = new Map<string, { t: number; data: OverpassData }>();
