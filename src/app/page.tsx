@@ -19,7 +19,7 @@ export default function Home() {
         <h2 className="text-3xl font-bold sm:text-4xl">Your next commute, your call.</h2>
         <Link href="/app?demo=1" className="mt-8 inline-block rounded-xl bg-emerald-500 px-7 py-3.5 font-semibold text-black hover:bg-emerald-400">Try Demo: SG Highway → Airport</Link>
       </section>
-      <footer className="border-t border-white/5 py-8 text-center text-xs text-gray-500">GlideWay · Map data © OpenStreetMap contributors · Routing by OSRM</footer>
+      <footer className="border-t border-white/5 py-8 text-center text-xs text-gray-500">GlideWay · Map data © OpenStreetMap contributors · Routing by OSRM · <Link href="/privacy" className="underline underline-offset-2 hover:text-gray-300">Privacy</Link></footer>
     </main>
   );
 }
