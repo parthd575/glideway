@@ -4,13 +4,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { GUJARAT_BBOX } from "@/lib/region";
 import { setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import Map, { Layer, Marker, Source, type MapRef } from "react-map-gl/maplibre";
-import { ArrowUpFromLine, Lightbulb } from "lucide-react";
+import { ArrowUpFromLine, Lightbulb, Navigation2 } from "lucide-react";
 import { MODE_BY_ID, ModeId } from "@/lib/modes";
 import type { Place, ScoredRoute } from "@/lib/types";
+import type { NavPosition } from "@/hooks/useNavigation";
+import type { GeoFix } from "@/hooks/useGeolocation";
 
 if (typeof window !== "undefined") setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
-const STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const STYLES = { dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json", light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json" } as const;
 // Used if the vector basemap cannot be fetched, so routes still render on a plain dark canvas.
 const FALLBACK_STYLE: StyleSpecification = { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": "#0b1220" } }] };
 const DASHES: number[][] = [[0, 4, 3], [0.5, 4, 2.5], [1, 4, 2], [1.5, 4, 1.5], [2, 4, 1], [2.5, 4, 0.5], [3, 4, 0], [0, 0.5, 3, 3.5], [0, 1, 3, 3], [0, 1.5, 3, 2.5], [0, 2, 3, 2], [0, 2.5, 3, 1.5], [0, 3, 3, 1], [0, 3.5, 3, 0.5]];
@@ -20,11 +22,18 @@ interface Props {
   active: ModeId;
   from: Place | null;
   to: Place | null;
+  stops: Place[];
   night: boolean;
+  theme: "light" | "dark";
   isMobile: boolean;
+  /** live position shown as a blue dot while planning */
+  userFix: GeoFix | null;
+  /** set while navigating: the camera follows this position */
+  navPos: NavPosition | null;
+  navigating: boolean;
 }
 
-export default function MapCanvas({ routes, active, from, to, night, isMobile }: Props) {
+export default function MapCanvas({ routes, active, from, to, stops, night, theme, isMobile, userFix, navPos, navigating }: Props) {
   const ref = useRef<MapRef>(null);
   const [styleFailed, setStyleFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -36,11 +45,23 @@ export default function MapCanvas({ routes, active, from, to, night, isMobile }:
   // Fit to all routes whenever they change
   useEffect(() => {
     const map = ref.current;
-    if (!map || routes.length === 0) return;
+    if (!map || routes.length === 0 || navigating) return;
     let w = 180, s = 90, e = -180, n = -90;
     for (const r of routes) for (const [x, y] of r.coordinates) { w = Math.min(w, x); e = Math.max(e, x); s = Math.min(s, y); n = Math.max(n, y); }
     map.fitBounds([[w, s], [e, n]], { padding: isMobile ? { top: 60, left: 30, right: 30, bottom: 280 } : { top: 80, bottom: 80, left: 440, right: 60 }, duration: 1200, maxZoom: 15 });
-  }, [routes, isMobile, loaded]);
+  }, [routes, isMobile, loaded, navigating]);
+
+  // Navigation camera: follow the driver, heading-up, tilted
+  useEffect(() => {
+    const map = ref.current;
+    if (!map || !navigating || !navPos) return;
+    map.easeTo({ center: [navPos.lng, navPos.lat], bearing: navPos.bearing, pitch: 55, zoom: 17, duration: 900, easing: (t) => t, padding: { top: isMobile ? 220 : 260, bottom: 0, left: 0, right: 0 } });
+  }, [navPos, navigating, isMobile]);
+  useEffect(() => {
+    const map = ref.current;
+    if (!map || navigating) return;
+    map.easeTo({ pitch: 0, bearing: 0, padding: { top: 0, bottom: 0, left: 0, right: 0 }, duration: 600 });
+  }, [navigating]);
 
   // Fly to a single selected place before routes exist
   useEffect(() => {
@@ -75,7 +96,7 @@ export default function MapCanvas({ routes, active, from, to, night, isMobile }:
         initialViewState={{ longitude: 72.57, latitude: 23.05, zoom: 10.5 }}
         maxBounds={[GUJARAT_BBOX[0] - 0.5, GUJARAT_BBOX[1] - 0.5, GUJARAT_BBOX[2] + 0.5, GUJARAT_BBOX[3] + 0.5]}
         minZoom={6}
-        mapStyle={styleFailed ? FALLBACK_STYLE : STYLE}
+        mapStyle={styleFailed ? FALLBACK_STYLE : STYLES[theme]}
         onError={(e) => { if (!styleFailed && /style|tile|fetch|Failed/i.test(String(e.error?.message))) setStyleFailed(true); }}
         style={{ width: "100%", height: "100%" }}
         attributionControl={{ compact: true }}
@@ -107,10 +128,23 @@ export default function MapCanvas({ routes, active, from, to, night, isMobile }:
           </Marker>
         ))}
 
-        {from && <Marker longitude={from.lng} latitude={from.lat}><div className="h-4 w-4 rounded-full border-4 border-emerald-400 bg-white shadow-lg" /></Marker>}
+        {userFix && !navigating && (
+          <Marker longitude={userFix.lng} latitude={userFix.lat} anchor="center">
+            <div title="You are here" className="relative grid h-5 w-5 place-items-center"><span className="user-pulse absolute inset-0 rounded-full bg-blue-500/50" /><span className="relative h-4 w-4 rounded-full border-[3px] border-white bg-blue-500 shadow-lg" /></div>
+          </Marker>
+        )}
+        {navigating && navPos && (
+          <Marker longitude={navPos.lng} latitude={navPos.lat} anchor="center" rotation={navPos.bearing} rotationAlignment="map" pitchAlignment="map">
+            <div className="grid h-11 w-11 place-items-center rounded-full border-2 border-white bg-blue-500 text-white shadow-xl shadow-blue-500/50"><Navigation2 size={22} fill="currentColor" /></div>
+          </Marker>
+        )}
+        {stops.map((s, i) => (
+          <Marker key={`stop-${i}`} longitude={s.lng} latitude={s.lat} anchor="center"><div className="grid h-6 w-6 place-items-center rounded-full border-2 border-white bg-amber-500 text-[11px] font-bold text-black shadow-lg">{i + 1}</div></Marker>
+        ))}
+        {from && !navigating && <Marker longitude={from.lng} latitude={from.lat}><div className="h-4 w-4 rounded-full border-4 border-emerald-400 bg-white shadow-lg" /></Marker>}
         {to && <Marker longitude={to.lng} latitude={to.lat}><div className="h-5 w-5 rounded-full border-4 border-white bg-red-500 shadow-lg" /></Marker>}
       </Map>
-      <div className={`pointer-events-none absolute inset-0 transition-opacity duration-1000 ${night ? "opacity-100" : "opacity-0"}`} style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(120,53,15,0.35) 100%)", mixBlendMode: "multiply" }} />
+      <div className={`pointer-events-none absolute inset-0 transition-opacity duration-1000 ${night && theme === "dark" ? "opacity-100" : "opacity-0"}`} style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(120,53,15,0.35) 100%)", mixBlendMode: "multiply" }} />
     </div>
   );
 }
