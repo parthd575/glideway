@@ -82,3 +82,50 @@ export function bbox(lines: LngLat[][], padDeg = 0.003): [number, number, number
   for (const l of lines) for (const [x, y] of l) { w = Math.min(w, x); e = Math.max(e, x); s = Math.min(s, y); n = Math.max(n, y); }
   return [s - padDeg, w - padDeg, n + padDeg, e + padDeg];
 }
+
+export function bearing(a: LngLat, b: LngLat): number {
+  const y = Math.sin(rad(b[0] - a[0])) * Math.cos(rad(b[1]));
+  const x = Math.cos(rad(a[1])) * Math.sin(rad(b[1])) - Math.sin(rad(a[1])) * Math.cos(rad(b[1])) * Math.cos(rad(b[0] - a[0]));
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+/** Cumulative distance (m) from the start of the line to each vertex. */
+export function cumulative(line: LngLat[]): number[] {
+  const out = [0];
+  for (let i = 1; i < line.length; i++) out.push(out[i - 1] + haversine(line[i - 1], line[i]));
+  return out;
+}
+
+export interface Snap { distM: number; progressM: number; point: LngLat; index: number }
+
+/** Project p onto the line. `from` limits the search to vertices >= that index so progress cannot jump backwards on loops. */
+export function snapToLine(p: LngLat, line: LngLat[], cum: number[], from = 0, window = 400): Snap | null {
+  if (line.length < 2) return null;
+  const k = Math.cos(rad(p[1]));
+  const px = p[0] * k * 111320, py = p[1] * 110540;
+  let best: Snap | null = null;
+  const end = Math.min(line.length - 1, from + window);
+  for (let i = Math.max(1, from + 1); i <= end; i++) {
+    const a = line[i - 1], b = line[i];
+    const ax = a[0] * k * 111320, ay = a[1] * 110540, bx = b[0] * k * 111320, by = b[1] * 110540;
+    const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+    const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+    const d = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+    if (!best || d < best.distM) best = { distM: d, progressM: cum[i - 1] + t * (cum[i] - cum[i - 1]), point: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], index: i - 1 };
+  }
+  return best;
+}
+
+/** Point at a given distance along the line. */
+export function pointAt(line: LngLat[], cum: number[], m: number): { point: LngLat; bearing: number } {
+  if (m <= 0) return { point: line[0], bearing: bearing(line[0], line[1] ?? line[0]) };
+  for (let i = 1; i < line.length; i++) {
+    if (cum[i] >= m) {
+      const t = (m - cum[i - 1]) / Math.max(cum[i] - cum[i - 1], 1e-9);
+      const a = line[i - 1], b = line[i];
+      return { point: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], bearing: bearing(a, b) };
+    }
+  }
+  const n = line.length;
+  return { point: line[n - 1], bearing: bearing(line[Math.max(0, n - 2)], line[n - 1]) };
+}
