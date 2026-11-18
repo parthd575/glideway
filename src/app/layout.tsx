@@ -31,9 +31,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // suppressHydrationWarning: browser extensions (for example Chrome extension emulators) add attributes to <html> and <body> before React hydrates
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
       >
         {children}
