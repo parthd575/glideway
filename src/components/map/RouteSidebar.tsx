@@ -147,7 +147,7 @@ export default function RouteSidebar(p: Props) {
 
   if (!p.isMobile) {
     return (
-      <motion.aside initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={SPRING} className="glass absolute bottom-4 left-4 top-4 z-20 w-[400px] overflow-hidden rounded-3xl shadow-2xl">
+      <motion.aside key="desktop" initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={SPRING} className="glass absolute bottom-4 left-4 top-4 z-20 w-[400px] overflow-hidden rounded-3xl shadow-2xl">
         {body}
       </motion.aside>
     );
@@ -157,6 +157,7 @@ export default function RouteSidebar(p: Props) {
   const collapsedY = sheetH - 250;
   return (
     <motion.aside
+      key="mobile"
       drag="y" dragControls={controls} dragListener={false} dragConstraints={{ top: 0, bottom: collapsedY }} dragElastic={0.08} dragMomentum={false}
       initial={{ y: collapsedY }} animate={{ y: expanded ? 0 : collapsedY }} transition={SPRING}
       onDragEnd={(_, i) => setExpanded(i.offset.y < 0 || i.velocity.y < -300 ? true : i.offset.y > 60 || i.velocity.y > 300 ? false : expanded)}
