@@ -9,19 +9,19 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://glideway-web.techg
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "GlideWay — Stop taking dark, pothole-filled shortcuts",
+  title: "GlideWay: four routes for every trip in Gujarat",
   description:
-    "Context-aware navigation. Choose Fastest, Signal-Free, Better Roads or Night-Safe routes instead of saving 60 seconds on a dark gali.",
+    "Compare the fastest, fewest signals, smoothest and best lit route for any trip in Gujarat, then navigate turn by turn. No account needed.",
   openGraph: {
-    title: "GlideWay — Route by how it feels, not just how fast",
-    description: "4 routes. Fewer red lights, smoother roads, well-lit streets after 9 PM.",
+    title: "GlideWay: get there on roads you trust",
+    description: "Four routes for every trip in Gujarat. Fewer signals, smoother roads and well lit streets after dark.",
     type: "website",
     images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
   },
   applicationName: "GlideWay",
   appleWebApp: { capable: true, title: "GlideWay", statusBarStyle: "black-translucent" as const },
   icons: { icon: [{ url: "/icons/icon-192.png", sizes: "192x192" }], apple: "/icons/apple-touch-icon.png" },
-  twitter: { card: "summary_large_image", title: "GlideWay", description: "Context-aware navigation for commuters." },
+  twitter: { card: "summary_large_image", title: "GlideWay", description: "Four routes for every trip in Gujarat, with turn by turn navigation." },
 };
 
 export const viewport = { themeColor: "#090D16", viewportFit: "cover" as const };
