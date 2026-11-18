@@ -7,6 +7,19 @@
   --foreground: #e5e7eb;
 }
 
+/* App theme tokens. Dark is the default; the planner wrapper switches them with data-theme. */
+.app-root {
+  --panel: #0b1020; --panel-2: #0f1523; --field: rgba(0, 0, 0, 0.3); --line: rgba(255, 255, 255, 0.1);
+  --ink: #e5e7eb; --dim: #8b93a1; --soft: #d1d5db; --glass: rgba(17, 24, 39, 0.72);
+  color: var(--ink);
+}
+.app-root[data-theme="light"] {
+  --panel: #ffffff; --panel-2: #f3f4f6; --field: #f1f3f6; --line: rgba(15, 23, 42, 0.12);
+  --ink: #0f172a; --dim: #64748b; --soft: #334155; --glass: rgba(255, 255, 255, 0.86);
+}
+.app-root[data-theme="light"] .maplibregl-ctrl-attrib { background: rgba(255, 255, 255, 0.75) !important; color: #475569 !important; }
+.app-root[data-theme="light"] .maplibregl-ctrl-attrib a { color: #475569 !important; }
+
 @theme inline {
   --color-background: var(--background);
   --color-card: var(--card);
@@ -15,6 +28,13 @@
   --color-signalfree: #10b981;
   --color-roads: #3b82f6;
   --color-night: #f59e0b;
+  --color-panel: var(--panel);
+  --color-panel2: var(--panel-2);
+  --color-field: var(--field);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-dim: var(--dim);
+  --color-soft: var(--soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -27,10 +47,10 @@ body {
 }
 
 .glass {
-  background: rgba(17, 24, 39, 0.72);
+  background: var(--glass, rgba(17, 24, 39, 0.72));
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
 }
 
 .grid-bg {
@@ -56,3 +76,9 @@ body {
 
 .maplibregl-ctrl-attrib { background: rgba(9,13,22,.7) !important; color: #9ca3af !important; }
 .maplibregl-ctrl-attrib a { color: #9ca3af !important; }
+
+@keyframes user-pulse {
+  0% { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+.user-pulse { animation: user-pulse 2s ease-out infinite; }
