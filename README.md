@@ -18,6 +18,21 @@ Four routes for every trip: **Fastest**, **Signal-Free**, **Better Roads** and *
 
 </div>
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/store/store-1-routes.png" width="19%" alt="Four route options">
+  <img src="docs/store/store-2-navigation.png" width="19%" alt="Navigation with lane guidance and speed limit">
+  <img src="docs/store/store-3-night.png" width="19%" alt="Night mode">
+  <img src="docs/store/store-4-saved.png" width="19%" alt="Saved places">
+</p>
+
+| Multi-stop planner (desktop) | Trip history |
+| --- | --- |
+| ![Multi-stop planner](docs/screenshots/d-multistop-light.png) | <img src="docs/screenshots/m-history.png" width="260" alt="Trip history"> |
+
+Store-style graphics live in [`docs/store`](docs/store) and raw captures in [`docs/screenshots`](docs/screenshots).
+
 ## Table of contents
 
 - [Overview](#overview)
@@ -26,7 +41,8 @@ Four routes for every trip: **Fastest**, **Signal-Free**, **Better Roads** and *
 - [Getting started](#getting-started)
 - [Configuration](#configuration)
 - [How routing works](#how-routing-works)
-- [Local OSM data pipeline](#local-osm-data-pipeline)
+- [Road data pipeline](#road-data-pipeline)
+- [Privacy and security](#privacy-and-security)
 - [Project structure](#project-structure)
 - [Deployment](#deployment)
 - [Limitations](#limitations)
@@ -49,6 +65,8 @@ Coverage is currently **Gujarat, India** only (see `src/lib/region.ts`).
 
 - **Turn-by-turn directions** for every route, with a step list and manoeuvre icons
 - **Live navigation:** GPS-following, heading-up 3D camera, next-turn banner, ETA and remaining distance, voice guidance, screen wake lock, and automatic rerouting when you leave the route
+- **Lane guidance and speed limits:** lane arrows before a turn where OpenStreetMap has turn-lane data, a speed-limit sign with your current speed, and an over-limit warning for posted limits. Where no limit is tagged it shows a labelled "typical" value for the road type
+- **Saved places and trip history:** Home, Work and favourites, quick picks in the search fields, and a list of past trips you can plan again. All stored on your device
 - **Use my location** as the starting point, with a live position dot on the map
 - **Multi-stop routes:** up to 3 intermediate stops, scored per leg and joined for each mode
 - **Light, dark and auto map themes** (auto is light by day and dark when night mode is on), plus a night mode that adds an amber tint and recommends Night-Safe
@@ -90,7 +108,9 @@ Other scripts:
 | `npm run start` | Serve the production build |
 | `npm run lint` | Run ESLint |
 | `npm run preview` | Build and preview on the Cloudflare runtime locally |
-| `npm run deploy` | Build and deploy to Cloudflare Workers |
+| `npm run osm:build -- file.osm.pbf` | Build road-data tiles from an OSM extract (needs `osmium`) |
+| `npm run osm:sync` | Copy built tiles into `public/osm` so they deploy with the Worker |
+| `npm run deploy` | Sync tiles, build and deploy to Cloudflare Workers |
 
 ## Configuration
 
@@ -101,7 +121,7 @@ All variables are optional.
 | `OSRM_URL` | Comma-separated OSRM base URLs, tried in a race | Public OSRM demo and OSM Germany servers |
 | `OVERPASS_URLS` | Comma-separated Overpass mirrors | `overpass-api.de`, `overpass.kumi.systems` |
 | `OSM_TILES_DIR` | Directory of pre-built OSM tiles | `data/osm-tiles` |
-| `NEXT_PUBLIC_SITE_URL` | Base URL for OpenGraph metadata | `https://glideway.vercel.app` |
+| `NEXT_PUBLIC_SITE_URL` | Base URL for OpenGraph, robots and sitemap | `https://glideway-web.techguidebro.workers.dev` |
 
 For the deployed Worker, `OSRM_URL` is set under `vars` in `wrangler.jsonc`.
 
@@ -124,20 +144,20 @@ The response includes a `source` field:
 | `partial` | OSM data unavailable; signal, lighting and smoothness values are estimates |
 | `sample` | Labelled illustrative data (demo fallback) |
 
-## Local OSM data pipeline
+## Road data pipeline
 
-To avoid Overpass rate limits, GlideWay can read signals and road tags from tiles prebuilt from an OSM extract.
+Route scores (signals, lighting, surface, speed limits) come from OpenStreetMap tiles prebuilt from a regional extract, so results do not depend on the rate-limited Overpass API.
 
 ```bash
-# 1. Download a regional extract (e.g. Geofabrik) and filter it with osmium
-osmium tags-filter gujarat-latest.osm.pbf w/highway n/highway=traffic_signals -o filtered.osm.pbf
-
-# 2. Convert to 0.25° JSON tiles in data/osm-tiles
-osmium export filtered.osm.pbf -f geojsonseq --geometry-types=point,linestring \
-  | node scripts/build-osm-tiles.mjs
+# Download an extract (e.g. from Geofabrik), then:
+npm run osm:build -- gujarat-latest.osm.pbf
 ```
 
-The tile size is defined in both `scripts/build-osm-tiles.mjs` and `src/lib/localOsm.ts` and must match. Extracts and tiles are git-ignored.
+This filters the extract with `osmium`, writes 0.1° JSON tiles to `data/osm-tiles` and copies them to `public/osm`. `npm run deploy` repeats the copy, so the tiles ship with the Worker as static assets and are read through its `ASSETS` binding. Locally, the same tiles are read from disk. If no tiles exist for an area, the engine falls back to Overpass, then to road-class estimates (`source: "partial"`).
+
+Only roads within about 100 m of the candidate routes are indexed per request. The tile size must match in `scripts/build-osm-tiles.mjs` and `src/lib/localOsm.ts`. Extracts and tiles are git-ignored, so rebuild them on any machine that deploys.
+
+**Data caveats.** OSM is community-maintained. In Ahmedabad, roughly 1 in 100 roads has a `maxspeed` tag and only a few dozen have `turn:lanes`, so most limits shown are labelled estimates and lane guidance appears only where it is mapped.
 
 ## Project structure
 
@@ -151,21 +171,23 @@ src/
   components/
     landing/            Hero, problem contrast, route showcase, tech flow
     map/                MapCanvas (basemap, routes, markers, navigation camera)
-    planner/            RouteSidebar, PlaceInput, RouteCard, DirectionsList, toggles
-    nav/                NavigationOverlay (turn banner, ETA bar)
+    planner/            RouteSidebar, PlaceInput, RouteCard, DirectionsList, LibraryPanel, toggles
+    nav/                NavigationOverlay (turn banner, ETA bar), LaneGuidance
     pwa/                Service worker registration
     ui/                 Shared UI (ManeuverIcon)
-  hooks/                useGeolocation, useNavigation, useTheme, usePwaInstall, useMediaQuery
+  hooks/                useGeolocation, useNavigation, useTheme, usePwaInstall, useSavedPlaces, useTripHistory, useLocationConsent
   lib/
     routing/            OSRM, Overpass, scoring, multi-stop merge
     server/             Route cache (memory + edge)
     navigation.ts       Snap to route, progress, ETA, off-route detection
     directions.ts       Instruction text, icons, distance and time formatting
     shareUrl.ts         Encode and decode shareable URLs
+    storage.ts          Local-only storage for saved places, trips and consent
     localOsm.ts         Local OSM tile reader
     photon.ts           Geocoding client
     region.ts           Gujarat bounds and checks
-public/                 sw.js (service worker), offline.html, icons
+public/                 sw.js (service worker), _headers, offline.html, icons
+docs/                   Screenshots and store-style graphics
 scripts/                OSM tile builder, MapLibre worker copy
 ```
 
@@ -178,7 +200,12 @@ npx wrangler login   # first time only
 npm run deploy
 ```
 
-Because Workers have no local filesystem for OSM tiles, production routing uses Overpass for road data and a hosted OSRM endpoint (configured in `wrangler.jsonc`).
+Workers have no local filesystem, so the road-data tiles ship as static assets (`public/osm`, built by `npm run osm:build`). Run that command before `npm run deploy` on a new machine. Routing uses the OSRM endpoints configured in `wrangler.jsonc`.
+
+## Privacy and security
+
+- **Privacy:** no accounts, ads, analytics or cookies. Live GPS stays in the browser; route coordinates are sent to the routing service. Saved places and history are local only. Users are asked before the browser's location prompt, and can delete their data. See [`/privacy`](src/app/privacy/page.tsx).
+- **Headers:** `next.config.ts` sets a Content-Security-Policy limited to the app, CARTO map tiles and the Photon geocoder, plus HSTS, `X-Frame-Options: DENY`, `nosniff`, a strict referrer policy, a Permissions-Policy that allows geolocation only for the site, and COOP. `public/_headers` covers static files such as `sw.js`. Scripts still need `'unsafe-inline'` for Next.js bootstrap code; nonces are a follow-up.
 
 ## Progressive web app
 
@@ -193,6 +220,7 @@ Bump `VERSION` in `public/sw.js` to invalidate old caches.
 ## Limitations
 
 - Coverage is limited to Gujarat; points outside it are rejected.
+- Lane guidance and posted speed limits depend on OSM tagging and are sparse; typical limits are estimates.
 - Voice guidance uses the browser's speech engine, so voices vary by device. Navigation needs a screen that stays on; browsers pause location updates in the background.
 - Navigation instructions come from OSRM manoeuvres and carry no live traffic or lane guidance.
 - Public OSRM, Overpass and Photon servers are for light and demo use. Self-host them before serving real traffic.
