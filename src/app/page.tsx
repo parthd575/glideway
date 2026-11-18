@@ -93,7 +93,7 @@ export default function Home() {
             </div>
             <div className="rise-in mx-auto grid w-full max-w-xl grid-cols-2 items-start gap-4 xl:mx-0" style={{ animationDelay: "120ms" }}>
               <Phone src="/landing/hero-navigation.jpg" alt="GlideWay navigation showing the next turn, lane arrows, speed limit and arrival time" />
-              <Phone src="/landing/hero-planner.jpg" alt="GlideWay route planner at night comparing four routes for a trip in Ahmedabad" className="mt-12" />
+              <Phone src="/landing/hero-routes.jpg" alt="GlideWay comparing four routes for a trip from Bopal to the airport: Fastest, Signal free, Better roads and Night safe, each with time, signals, smoothness and lighting" className="mt-12" />
             </div>
           </div>
         </section>
