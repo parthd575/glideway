@@ -1,11 +1,11 @@
 import { cumulative, haversine, snapToLine } from "./geo";
-import type { LngLat, ScoredRoute, Step } from "./types";
+import type { LngLat, ScoredRoute, SpeedLimit, Step } from "./types";
 
-export interface PreparedRoute { line: LngLat[]; cum: number[]; steps: Step[]; totalM: number; totalS: number; stopsM: number[] }
+export interface PreparedRoute { line: LngLat[]; cum: number[]; steps: Step[]; totalM: number; totalS: number; stopsM: number[]; limits: SpeedLimit[] }
 
 export function prepareRoute(r: ScoredRoute): PreparedRoute {
   const cum = cumulative(r.coordinates);
-  return { line: r.coordinates, cum, steps: r.steps ?? [], totalM: cum[cum.length - 1] ?? 0, totalS: r.durationS, stopsM: r.stopsM ?? [] };
+  return { line: r.coordinates, cum, steps: r.steps ?? [], totalM: cum[cum.length - 1] ?? 0, totalS: r.durationS, stopsM: r.stopsM ?? [], limits: r.speedLimits ?? [] };
 }
 
 export interface NavProgress {
@@ -19,6 +19,13 @@ export interface NavProgress {
   remainingM: number;
   remainingS: number;
   arrived: boolean;
+}
+
+/** Speed limit in force at `progressM`, or null if unknown. */
+export function limitAt(p: PreparedRoute, progressM: number): SpeedLimit | null {
+  let cur: SpeedLimit | null = null;
+  for (const l of p.limits) { if (l.fromM <= progressM) cur = l; else break; }
+  return cur;
 }
 
 export const OFF_ROUTE_M = 60;

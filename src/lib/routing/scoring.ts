@@ -1,5 +1,5 @@
 import { haversine, sampleLine, SegGrid } from "../geo";
-import type { LngLat, Marker, ScoredRoute } from "../types";
+import type { LngLat, Marker, ScoredRoute, SpeedLimit } from "../types";
 import type { ModeId } from "../modes";
 import type { Candidate } from "./osrm";
 import type { OverpassData, WayTags } from "./overpass";
@@ -29,6 +29,39 @@ function smoothValue(t: WayTags | undefined): number {
   return 0.35;
 }
 
+/** Posted limit from an OSM `maxspeed` tag, in km/h. Handles "50", "50 km/h" and "30 mph". */
+export function parseMaxspeed(v?: string): number | null {
+  if (!v) return null;
+  const m = /^\s*(\d{1,3})\s*(mph|km\/h)?\s*$/i.exec(v);
+  if (!m) return null; // "walk", "IN:urban", lists like "60;40" are skipped
+  const n = Number(m[1]) * (m[2]?.toLowerCase() === "mph" ? 1.609 : 1);
+  return n >= 5 && n <= 140 ? Math.round(n / 5) * 5 : null;
+}
+
+/** Typical limits on Indian roads, used where no limit is tagged. These are estimates, not posted limits. */
+const CLASS_LIMIT: Record<string, number> = { motorway: 100, motorway_link: 60, trunk: 80, trunk_link: 50, primary: 60, primary_link: 40, secondary: 50, secondary_link: 40, tertiary: 40, unclassified: 40, residential: 30 };
+
+function limitFor(t: WayTags | undefined): { kph: number; est: boolean } | null {
+  if (!t) return null;
+  const posted = parseMaxspeed(t.maxspeed);
+  if (posted) return { kph: posted, est: false };
+  const c = t.highway ? CLASS_LIMIT[t.highway] : undefined;
+  return c ? { kph: c, est: true } : null;
+}
+
+/** Drop limit changes shorter than 150 m (tagging gaps and junction stubs) so the sign doesn't flicker. */
+export function smoothLimits(l: SpeedLimit[]): SpeedLimit[] {
+  const out: SpeedLimit[] = [];
+  l.forEach((e, i) => {
+    const len = (l[i + 1]?.fromM ?? Infinity) - e.fromM;
+    if (len < 150 && i < l.length - 1) { if (!out.length) out.push({ ...e, kph: l[i + 1].kph, est: l[i + 1].est, fromM: 0 }); return; }
+    const prev = out[out.length - 1];
+    if (prev && prev.kph === e.kph && !!prev.est === !!e.est) return;
+    out.push(out.length ? e : { ...e, fromM: 0 });
+  });
+  return out;
+}
+
 export function enrich(c: Candidate, data: OverpassData): Omit<ScoredRoute, "mode"> {
   const samples = sampleLine(c.coordinates, 40);
   const sigGrid = new SegGrid<null>(0.002);
@@ -49,9 +82,14 @@ export function enrich(c: Candidate, data: OverpassData): Omit<ScoredRoute, "mod
     if (bridgeRun.length >= 3) { flyovers++; const m = bridgeRun[Math.floor(bridgeRun.length / 2)]; markers.push({ type: "flyover", lng: m[0], lat: m[1] }); }
     bridgeRun = [];
   };
-  for (const p of samples) {
+  const speedLimits: SpeedLimit[] = [];
+  for (let si = 0; si < samples.length; si++) {
+    const p = samples[si];
     const hit = data.grid.nearest(p, 25);
     const tags = hit?.seg.data;
+    const lim = limitFor(tags);
+    const prevLim = speedLimits[speedLimits.length - 1];
+    if (lim && (!prevLim || prevLim.kph !== lim.kph || !!prevLim.est !== lim.est)) speedLimits.push({ fromM: Math.round(si * 40), kph: lim.kph, ...(lim.est ? { est: true } : {}) });
     const l = litValue(tags);
     lit += l; smooth += smoothValue(tags);
     if (l >= 0.99) litRun.push(p); else flush();
@@ -59,7 +97,7 @@ export function enrich(c: Candidate, data: OverpassData): Omit<ScoredRoute, "mod
   }
   flush(); flushBridge();
   const n = Math.max(samples.length, 1);
-  return { coordinates: c.coordinates, distanceM: c.distanceM, durationS: c.durationS, steps: c.steps, signals: signals.length, litPct: Math.round((lit / n) * 100), smoothPct: Math.round((smooth / n) * 100), flyovers, markers };
+  return { coordinates: c.coordinates, distanceM: c.distanceM, durationS: c.durationS, steps: c.steps, speedLimits: smoothLimits(speedLimits), signals: signals.length, litPct: Math.round((lit / n) * 100), smoothPct: Math.round((smooth / n) * 100), flyovers, markers };
 }
 
 export type Enriched = Omit<ScoredRoute, "mode">;

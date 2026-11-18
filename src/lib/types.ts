@@ -8,6 +8,16 @@ export interface Marker {
   lat: number;
 }
 
+export interface Lane {
+  /** turn directions this lane allows: "left", "straight", "slight right", ... */
+  ind: string[];
+  /** true if the lane leads to the route's next manoeuvre */
+  ok: boolean;
+}
+
+/** Speed limit from `fromM` (distance along the route) until the next entry. `est` marks a road-class default, not a posted limit. */
+export interface SpeedLimit { fromM: number; kph: number; est?: boolean }
+
 /** One manoeuvre of a route. `startM` is the distance from the route start at which it happens. */
 export interface Step {
   type: string;
@@ -19,6 +29,8 @@ export interface Step {
   startM: number;
   lng: number;
   lat: number;
+  /** lane layout at the manoeuvre, where OpenStreetMap has turn-lane data */
+  lanes?: Lane[];
 }
 
 export interface ScoredRoute {
@@ -34,6 +46,8 @@ export interface ScoredRoute {
   markers: Marker[];
   /** turn-by-turn manoeuvres, in order (the last one is the arrival) */
   steps?: Step[];
+  /** speed limit along the route, as run-length entries */
+  speedLimits?: SpeedLimit[];
   /** distance from route start at which each intermediate stop is reached */
   stopsM?: number[];
   /** set when this mode's best path is physically identical to another mode's */

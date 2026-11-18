@@ -7,7 +7,9 @@ export const UA = { "User-Agent": "GlideWay/0.1 (route scoring demo)", "ngrok-sk
 
 export interface Candidate { coordinates: LngLat[]; distanceM: number; durationS: number; steps: Step[] }
 
-interface OsrmStep { distance: number; duration: number; name: string; maneuver: { type: string; modifier?: string; location: LngLat; exit?: number } }
+interface OsrmLane { valid: boolean; indications: string[] }
+interface OsrmIntersection { lanes?: OsrmLane[] }
+interface OsrmStep { distance: number; duration: number; name: string; maneuver: { type: string; modifier?: string; location: LngLat; exit?: number }; intersections?: OsrmIntersection[] }
 interface OsrmLeg { steps: OsrmStep[] }
 interface OsrmRoute { geometry: { coordinates: LngLat[] }; distance: number; duration: number; legs: OsrmLeg[] }
 
@@ -15,6 +17,7 @@ interface OsrmRoute { geometry: { coordinates: LngLat[] }; distance: number; dur
 function toSteps(legs: OsrmLeg[]): Step[] {
   const out: Step[] = [];
   let at = 0;
+  const toLanes = (l?: OsrmLane[]) => (l && l.length > 1 ? l.map((x) => ({ ind: x.indications, ok: x.valid })) : undefined);
   legs.forEach((leg, li) => {
     for (const s of leg.steps) {
       const t = s.maneuver.type;
@@ -25,7 +28,7 @@ function toSteps(legs: OsrmLeg[]): Step[] {
         at += s.distance;
         continue;
       }
-      out.push({ type: t, modifier: s.maneuver.modifier, name: s.name, exit: s.maneuver.exit, distanceM: s.distance, durationS: s.duration, startM: at, lng: s.maneuver.location[0], lat: s.maneuver.location[1] });
+      out.push({ type: t, modifier: s.maneuver.modifier, name: s.name, exit: s.maneuver.exit, distanceM: s.distance, durationS: s.duration, startM: at, lng: s.maneuver.location[0], lat: s.maneuver.location[1], lanes: toLanes(s.intersections?.[0]?.lanes) });
       at += s.distance;
     }
   });

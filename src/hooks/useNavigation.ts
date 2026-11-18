@@ -26,6 +26,7 @@ export function useNavigation({ route, running, simulate, voice, onOffRoute }: O
   const [position, setPosition] = useState<NavPosition | null>(null);
   const [rerouting, setRerouting] = useState(false);
   const [rerouteCount, setRerouteCount] = useState(0);
+  const [speedMps, setSpeedMps] = useState<number | null>(null);
   const { fix, status } = useGeolocation(running && !simulate);
 
   const prepared = useMemo(() => (navRoute ? prepareRoute(navRoute) : null), [navRoute]);
@@ -43,12 +44,13 @@ export function useNavigation({ route, running, simulate, voice, onOffRoute }: O
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running]);
 
-  const handleFix = useCallback((pos: LngLat, heading: number | null, accuracy: number, moving: boolean) => {
+  const handleFix = useCallback((pos: LngLat, heading: number | null, accuracy: number, moving: boolean, speed: number | null) => {
     if (!prepared) return;
     const p = locate(prepared, pos, seg.current);
     if (!p) return;
     seg.current = p.segIndex;
     setProgress(p);
+    setSpeedMps(speed);
     const onRoute = p.offRouteM <= OFF_ROUTE_M;
     const shown = onRoute ? p.snapped : pos;
     const a = prepared.line[Math.min(p.segIndex, prepared.line.length - 2)], b = prepared.line[Math.min(p.segIndex + 1, prepared.line.length - 1)];
@@ -68,7 +70,7 @@ export function useNavigation({ route, running, simulate, voice, onOffRoute }: O
   // Real GPS
   useEffect(() => {
     if (!running || simulate || !fix) return;
-    handleFix([fix.lng, fix.lat], fix.heading, fix.accuracy, (fix.speed ?? 0) > 1);
+    handleFix([fix.lng, fix.lat], fix.heading, fix.accuracy, (fix.speed ?? 0) > 1, fix.speed);
   }, [fix, running, simulate, handleFix]);
 
   // Simulated drive along the route (for demos and testing without moving)
@@ -78,7 +80,7 @@ export function useNavigation({ route, running, simulate, voice, onOffRoute }: O
     const t = setInterval(() => {
       m = Math.min(prepared.totalM, m + SIM_SPEED_MPS);
       const { point, bearing } = pointAt(prepared.line, prepared.cum, m);
-      handleFix(point, bearing, 5, true);
+      handleFix(point, bearing, 5, true, SIM_SPEED_MPS);
     }, 1000);
     return () => clearInterval(t);
   }, [running, simulate, prepared, handleFix]);
@@ -110,5 +112,5 @@ export function useNavigation({ route, running, simulate, voice, onOffRoute }: O
     return () => { document.removeEventListener("visibilitychange", vis); lock?.release().catch(() => {}); };
   }, [running]);
 
-  return { navRoute, prepared, progress, position, rerouting, rerouteCount, geoStatus: (simulate ? "active" : status) as GeoStatus };
+  return { navRoute, prepared, progress, position, speedMps, rerouting, rerouteCount, geoStatus: (simulate ? "active" : status) as GeoStatus };
 }

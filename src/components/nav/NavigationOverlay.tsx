@@ -5,6 +5,8 @@ import { Flag, Loader2, LocateOff, Volume2, VolumeX, X } from "lucide-react";
 import ManeuverIcon from "@/components/ui/ManeuverIcon";
 import { describeStep, fmtDistance, fmtDuration, stepIcon } from "@/lib/directions";
 import type { NavProgress, PreparedRoute } from "@/lib/navigation";
+import { limitAt } from "@/lib/navigation";
+import LaneGuidance from "./LaneGuidance";
 import type { GeoStatus } from "@/hooks/useGeolocation";
 import { OFF_ROUTE_M } from "@/lib/navigation";
 
@@ -18,13 +20,18 @@ interface Props {
   rerouting: boolean;
   geoStatus: GeoStatus;
   simulate: boolean;
+  speedMps: number | null;
 }
 
-export default function NavigationOverlay({ prepared, progress, color, voice, onVoice, onEnd, rerouting, geoStatus, simulate }: Props) {
+export default function NavigationOverlay({ prepared, progress, color, voice, onVoice, onEnd, rerouting, geoStatus, simulate, speedMps }: Props) {
   const step = progress ? prepared.steps[progress.nextIndex] : prepared.steps[0];
   const after = progress ? prepared.steps[progress.nextIndex + 1] : undefined;
   const eta = progress ? new Date(Date.now() + progress.remainingS * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "--";
   const off = !!progress && progress.offRouteM > OFF_ROUTE_M;
+  const limit = progress ? limitAt(prepared, progress.progressM) : null;
+  const kph = speedMps != null ? Math.round(speedMps * 3.6) : null;
+  const over = !!limit && !limit.est && kph != null && kph > limit.kph + 3;
+  const lanes = step?.lanes && progress && progress.distToNextM < 800 ? step.lanes : undefined;
   const noGps = !simulate && (geoStatus === "denied" || geoStatus === "unavailable");
 
   if (progress?.arrived) {
@@ -49,6 +56,7 @@ export default function NavigationOverlay({ prepared, progress, color, voice, on
               <div className="mt-1 text-sm text-soft">{step ? describeStep(step) : "Locating you…"}</div>
             </div>
           </div>
+          {lanes && <LaneGuidance lanes={lanes} />}
           {after && after.type !== "arrive" && <div className="border-t border-line bg-field px-4 py-1.5 text-xs text-dim">Then: {describeStep(after)}</div>}
           {(rerouting || off || noGps || simulate || !progress) && (
             <div className="flex items-center gap-2 border-t border-line px-4 py-1.5 text-xs">
@@ -61,6 +69,18 @@ export default function NavigationOverlay({ prepared, progress, color, voice, on
           )}
         </div>
       </motion.div>
+
+      {(limit || kph != null) && (
+        <div className="pointer-events-none absolute bottom-28 left-3 z-30 flex items-end gap-2 pb-[env(safe-area-inset-bottom)]">
+          {limit && (
+            <div title={limit.est ? "Typical limit for this road type (not posted)" : "Posted speed limit"} className="flex flex-col items-center">
+              <div className={`grid h-14 w-14 place-items-center rounded-full bg-white text-xl font-extrabold text-black shadow-xl ${limit.est ? "border-[5px] border-dashed border-gray-400" : "border-[5px] border-red-600"}`}>{limit.kph}</div>
+              {limit.est && <span className="mt-0.5 rounded bg-panel/90 px-1 text-[10px] font-medium text-dim">typical</span>}
+            </div>
+          )}
+          {kph != null && <div className={`rounded-xl border px-3 py-1.5 text-center shadow-xl ${over ? "border-red-500 bg-red-600 text-white" : "border-line bg-panel text-ink"}`}><div className="text-xl font-bold leading-none">{kph}</div><div className="text-[10px] opacity-70">km/h</div></div>}
+        </div>
+      )}
 
       <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="absolute inset-x-3 bottom-4 z-30 mx-auto max-w-md pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-center gap-3 rounded-2xl border border-line bg-panel p-3 shadow-2xl">
