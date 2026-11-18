@@ -79,8 +79,9 @@ export default function Home() {
         <section className="px-6 pb-24 pt-24">
           <div className="mx-auto grid max-w-7xl items-center gap-12 xl:grid-cols-[680px_1fr] xl:pt-12">
             <div className="rise-in">
+              <p className="mb-6 text-6xl font-semibold text-white sm:text-7xl lg:text-8xl">Glide<span className="text-emerald-400">Way</span></p>
               <h1 className="heading-1 max-w-[680px] bg-linear-to-r from-white to-[#9B9B9B] bg-clip-text pb-1 text-transparent">
-                Drive roads you trust, <br className="hidden sm:block" />not dark shortcuts
+                Drive roads you&nbsp;trust, <br className="hidden sm:block" />not&nbsp;dark&nbsp;shortcuts
               </h1>
               <p className="body-3 mt-6 max-w-[680px] text-lg text-[#9B9B9B]">
                 GlideWay compares four routes for every trip in Gujarat: fastest, fewest signals, smoothest roads and best lit streets. Pick one and get turn by turn directions.
