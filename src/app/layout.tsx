@@ -4,8 +4,11 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import PwaRegister from "@/components/pwa/PwaRegister";
 
+/** Canonical origin for OpenGraph and sitemap URLs. Override with NEXT_PUBLIC_SITE_URL once a custom domain is attached. */
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://glideway-web.techguidebro.workers.dev";
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://glideway.vercel.app"),
+  metadataBase: new URL(SITE_URL),
   title: "GlideWay — Stop taking dark, pothole-filled shortcuts",
   description:
     "Context-aware navigation. Choose Fastest, Signal-Free, Better Roads or Night-Safe routes instead of saving 60 seconds on a dark gali.",
