@@ -52,3 +52,8 @@ next-env.d.ts
 
 # generated OSM tiles served as Worker assets
 /public/osm
+
+# local AI skills (installed per machine, never committed)
+/.agents
+/.claude
+/skills-lock.json
