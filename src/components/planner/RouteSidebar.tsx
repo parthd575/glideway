@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, useDragControls } from "framer-motion";
-import { ArrowDownUp, Check, Download, Link2, Loader2, Navigation, Play, Plus } from "lucide-react";
+import { ArrowDownUp, Bookmark, Check, Download, Link2, Loader2, Navigation, Play, Plus } from "lucide-react";
 import { MODE_BY_ID, ModeId, SPRING } from "@/lib/modes";
 import { MAX_STOPS } from "@/lib/routing/limits";
 import type { Place, RouteResponse } from "@/lib/types";
+import type { PlaceKind } from "@/lib/storage";
 import type { ThemePref } from "@/hooks/useTheme";
 import NightModeToggle from "./NightModeToggle";
-import PlaceInput from "./PlaceInput";
+import PlaceInput, { type QuickPick } from "./PlaceInput";
+import LibraryPanel, { type LibraryApi } from "./LibraryPanel";
 import RouteCard from "./RouteCard";
 import DirectionsList from "./DirectionsList";
 import ThemeToggle from "./ThemeToggle";
@@ -24,11 +26,13 @@ interface Props {
   theme: ThemePref; setTheme: (t: ThemePref) => void;
   onStartNav: (simulate: boolean) => void;
   canInstall: boolean; onInstall: () => void;
+  quick: QuickPick[]; onSavePlace: (kind: PlaceKind, place: Place) => void; library: LibraryApi;
   isMobile: boolean;
 }
 
 export default function RouteSidebar(p: Props) {
   const [copied, setCopied] = useState(false);
+  const [view, setView] = useState<"plan" | "library">("plan");
   const [expanded, setExpanded] = useState(true);
   const [vh, setVh] = useState(800);
   const [kb, setKb] = useState(0); // px covered by the on-screen keyboard (iOS overlays instead of resizing)
@@ -61,23 +65,30 @@ export default function RouteSidebar(p: Props) {
   const setStop = (i: number, v: Place | null) => p.setStops(p.stops.map((s, j) => (j === i ? v : s)));
   const removeStop = (i: number) => p.setStops(p.stops.filter((_, j) => j !== i));
 
-  const body = (
+  const library: LibraryApi = {
+    ...p.library,
+    onUsePlace: (pl, as) => { p.library.onUsePlace(pl, as); setView("plan"); },
+    onUseTrip: (t) => { p.library.onUseTrip(t); setView("plan"); },
+  };
+
+  const plan = (
     <div onFocusCapture={() => { if (p.isMobile) setExpanded(true); }} className="flex h-full min-h-0 flex-col gap-3 p-4">
       <div className="flex items-center justify-between gap-2">
         <Link href="/" className="text-lg font-bold tracking-tight">Glide<span className="text-emerald-500">Way</span></Link>
         <div className="flex items-center gap-1.5">
           {p.canInstall && <button onClick={p.onInstall} aria-label="Install app" title="Install GlideWay" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-soft transition hover:bg-line"><Download size={14} /></button>}
+          <button onClick={() => setView("library")} aria-label="Saved places and trip history" title="Saved places and trips" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-soft transition hover:bg-line"><Bookmark size={14} /></button>
           <ThemeToggle value={p.theme} onChange={p.setTheme} />
           <button onClick={share} disabled={!routes} className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs text-soft transition hover:bg-line disabled:opacity-40">{copied ? <Check size={13} className="text-emerald-500" /> : <Link2 size={13} />}{copied ? "Copied" : "Share"}</button>
         </div>
       </div>
 
       <div className="space-y-2">
-        <PlaceInput label="Starting point" dot="#34d399" value={p.from} onPick={p.setFrom} listMax={listMax} onLocate={p.onLocateFrom} />
+        <PlaceInput label="Starting point" dot="#34d399" value={p.from} onPick={p.setFrom} listMax={listMax} onLocate={p.onLocateFrom} quick={p.quick} onSave={p.onSavePlace} />
         {p.stops.map((s, i) => (
-          <PlaceInput key={i} label={`Stop ${i + 1}`} dot="#f59e0b" value={s} onPick={(v) => setStop(i, v)} onRemove={() => removeStop(i)} listMax={listMax} bias={p.from ? { lat: p.from.lat, lng: p.from.lng } : undefined} />
+          <PlaceInput key={i} label={`Stop ${i + 1}`} dot="#f59e0b" value={s} onPick={(v) => setStop(i, v)} onRemove={() => removeStop(i)} listMax={listMax} quick={p.quick} onSave={p.onSavePlace} bias={p.from ? { lat: p.from.lat, lng: p.from.lng } : undefined} />
         ))}
-        <PlaceInput label="Destination" dot="#ef4444" value={p.to} onPick={p.setTo} bias={p.from ? { lat: p.from.lat, lng: p.from.lng } : undefined} listMax={listMax} />
+        <PlaceInput label="Destination" dot="#ef4444" value={p.to} onPick={p.setTo} quick={p.quick} onSave={p.onSavePlace} bias={p.from ? { lat: p.from.lat, lng: p.from.lng } : undefined} listMax={listMax} />
         <div className="flex items-center justify-between">
           <AddStop disabled={p.stops.length >= MAX_STOPS} onAdd={() => p.setStops([...p.stops, null])} count={p.stops.length} />
           <button onClick={p.onSwap} className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-dim transition hover:bg-line hover:text-ink"><ArrowDownUp size={13} /> Swap</button>
@@ -112,6 +123,8 @@ export default function RouteSidebar(p: Props) {
 
     </div>
   );
+
+  const body = view === "library" ? <LibraryPanel api={library} onBack={() => setView("plan")} /> : plan;
 
   if (!p.isMobile) {
     return (

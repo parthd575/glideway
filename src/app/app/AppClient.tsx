@@ -5,6 +5,8 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import RouteSidebar from "@/components/planner/RouteSidebar";
 import NavigationOverlay from "@/components/nav/NavigationOverlay";
+import ConsentDialog from "@/components/ui/ConsentDialog";
+import type { QuickPick } from "@/components/planner/PlaceInput";
 import { MODES, MODE_BY_ID, ModeId } from "@/lib/modes";
 import { DEMO_FROM, DEMO_TO } from "@/lib/mockCities";
 import { inGujarat, REGION_NAME } from "@/lib/region";
@@ -16,6 +18,10 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useNavigation } from "@/hooks/useNavigation";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocationConsent } from "@/hooks/useConsent";
+import { useSavedPlaces } from "@/hooks/useSavedPlaces";
+import { useTripHistory } from "@/hooks/useTripHistory";
+import type { Trip } from "@/lib/storage";
 
 const MapCanvas = dynamic(() => import("@/components/map/MapCanvas"), { ssr: false });
 
@@ -45,6 +51,10 @@ export default function AppClient() {
   const hadModeParam = useRef(isMode(sp.get("mode")));
   const install = usePwaInstall();
   const geo = useGeolocation(showMe && !navigating);
+  const consent = useLocationConsent();
+  const saved = useSavedPlaces();
+  const history = useTripHistory();
+  const tripId = useRef<string | null>(null);
 
   const theme = useTheme(night);
   const readyStops = useMemo(() => filled(stops), [stops]);
@@ -94,13 +104,14 @@ export default function AppClient() {
 
   const onLocateFrom = useCallback(async () => {
     setNotice(null);
+    if (!(await consent.ensure())) return;
     try {
       const f = await geo.locate();
       if (!inGujarat([f.lng, f.lat])) { setNotice(`You appear to be outside ${REGION_NAME}. GlideWay only covers ${REGION_NAME} for now.`); return; }
       setFrom({ label: "My location", sublabel: "Current GPS position", lng: f.lng, lat: f.lat });
       setShowMe(true);
     } catch (e) { setNotice(e instanceof Error ? e.message : "Couldn't get your location."); }
-  }, [geo]);
+  }, [geo, consent]);
 
   const activeRoute = data?.routes.find((r) => r.mode === active) ?? null;
 
@@ -118,8 +129,36 @@ export default function AppClient() {
 
   const nav = useNavigation({ route: activeRoute, running: navigating, simulate, voice, onOffRoute });
 
-  const startNav = (sim: boolean) => { setSimulate(sim); setNavigating(true); };
-  const endNav = () => setNavigating(false);
+  const startNav = async (sim: boolean) => {
+    if (!sim && !(await consent.ensure())) return;
+    setSimulate(sim); setNavigating(true);
+    if (from && to && activeRoute) {
+      tripId.current = history.add({ from, to, stops: readyStops, mode: active, distanceM: activeRoute.distanceM, durationS: activeRoute.durationS, simulated: sim });
+    }
+  };
+  const endNav = () => { setNavigating(false); tripId.current = null; };
+
+  // Mark the trip as completed on arrival
+  const arrived = !!nav.progress?.arrived;
+  useEffect(() => { if (navigating && arrived && tripId.current) history.complete(tripId.current); }, [arrived, navigating, history]);
+
+  const quick = useMemo<QuickPick[]>(() => {
+    const out: QuickPick[] = saved.places.map((s) => ({ place: s.place, tag: s.kind, name: s.name }));
+    const seen = new Set(out.map((q) => `${q.place.lat},${q.place.lng}`));
+    for (const t of history.trips) {
+      const k = `${t.to.lat},${t.to.lng}`;
+      if (seen.has(k) || out.length >= 8) continue;
+      seen.add(k); out.push({ place: t.to, tag: "recent", name: t.to.label });
+    }
+    return out;
+  }, [saved.places, history.trips]);
+
+  const library = useMemo(() => ({
+    places: saved.places, trips: history.trips,
+    onRemovePlace: saved.remove, onRemoveTrip: history.remove, onClearTrips: history.clear,
+    onUseTrip: (t: Trip) => { setFrom(t.from); setTo(t.to); setStops(t.stops); setActive(t.mode); },
+    onUsePlace: (p: Place, as: "from" | "to") => (as === "from" ? setFrom(p) : setTo(p)),
+  }), [saved.places, saved.remove, history.trips, history.remove, history.clear]);
 
   const mapRoutes = useMemo(() => (navigating && nav.navRoute ? [nav.navRoute] : data?.routes ?? []), [navigating, nav.navRoute, data]);
 
@@ -127,7 +166,7 @@ export default function AppClient() {
     <main data-theme={effectiveTheme} className="app-root relative h-dvh w-screen overflow-hidden bg-background">
       {ready && <MapCanvas routes={mapRoutes} active={active} from={from} to={to} stops={readyStops} night={night} theme={effectiveTheme} isMobile={isMobile} userFix={geo.fix} navPos={nav.position} navigating={navigating} />}
       {navigating && nav.prepared ? (
-        <NavigationOverlay prepared={nav.prepared} progress={nav.progress} color={MODE_BY_ID[active].color} voice={voice} onVoice={setVoice} onEnd={endNav} rerouting={nav.rerouting} geoStatus={nav.geoStatus} simulate={simulate} />
+        <NavigationOverlay prepared={nav.prepared} progress={nav.progress} color={MODE_BY_ID[active].color} voice={voice} onVoice={setVoice} onEnd={endNav} rerouting={nav.rerouting} geoStatus={nav.geoStatus} simulate={simulate} speedMps={nav.speedMps} />
       ) : (
         <RouteSidebar
           from={from} to={to} stops={stops} setFrom={setFrom} setTo={setTo} setStops={setStops}
@@ -135,9 +174,10 @@ export default function AppClient() {
           data={data} loading={loading} error={error} notice={notice}
           active={active} setActive={setActive} night={night} autoNight={autoNight} setNight={setNight}
           theme={theme.pref} setTheme={theme.setPref} onStartNav={startNav}
-          canInstall={install.canInstall} onInstall={install.install} isMobile={isMobile}
+          canInstall={install.canInstall} onInstall={install.install} quick={quick} onSavePlace={saved.save} library={library} isMobile={isMobile}
         />
       )}
+      {consent.asking && <ConsentDialog onAnswer={consent.answer} />}
     </main>
   );
 }
