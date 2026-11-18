@@ -8,6 +8,19 @@ export interface Marker {
   lat: number;
 }
 
+/** One manoeuvre of a route. `startM` is the distance from the route start at which it happens. */
+export interface Step {
+  type: string;
+  modifier?: string;
+  name: string;
+  exit?: number;
+  distanceM: number;
+  durationS: number;
+  startM: number;
+  lng: number;
+  lat: number;
+}
+
 export interface ScoredRoute {
   mode: ModeId;
   /** GeoJSON [lng, lat] coordinates */
@@ -19,6 +32,10 @@ export interface ScoredRoute {
   smoothPct: number;
   flyovers: number;
   markers: Marker[];
+  /** turn-by-turn manoeuvres, in order (the last one is the arrival) */
+  steps?: Step[];
+  /** distance from route start at which each intermediate stop is reached */
+  stopsM?: number[];
   /** set when this mode's best path is physically identical to another mode's */
   sameAs?: ModeId;
 }

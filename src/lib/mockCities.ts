@@ -49,7 +49,12 @@ function markers(coords: LngLat[], mode: ModeId): Marker[] {
 export function sampleRoutes(): RouteResponse {
   const routes = (Object.keys(PATHS) as ModeId[]).map((mode) => {
     const coordinates = smooth(PATHS[mode]);
-    return { mode, coordinates, ...META[mode], markers: markers(coordinates, mode) } satisfies ScoredRoute;
+    const m = META[mode], a = coordinates[0], z = coordinates[coordinates.length - 1];
+    const steps = [
+      { type: "depart", name: "", distanceM: m.distanceM, durationS: m.durationS, startM: 0, lng: a[0], lat: a[1] },
+      { type: "arrive", name: "", distanceM: 0, durationS: 0, startM: m.distanceM, lng: z[0], lat: z[1] },
+    ];
+    return { mode, coordinates, ...m, markers: markers(coordinates, mode), steps } satisfies ScoredRoute;
   });
   return {
     routes, source: "sample",
