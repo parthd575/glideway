@@ -33,7 +33,7 @@ export default function LibraryPanel({ api, onBack }: { api: LibraryApi; onBack:
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5" style={{ touchAction: "pan-y" }}>
+      <div data-sheet-scroll className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5" style={{ touchAction: "pan-y" }}>
         {tab === "saved" && (api.places.length === 0
           ? <p className="px-1 py-6 text-center text-sm text-dim">No saved places yet. Pick a place, then tap the bookmark in its field to save it as Home, Work or a favourite.</p>
           : api.places.map((s) => {

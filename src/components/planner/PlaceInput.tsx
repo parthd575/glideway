@@ -95,7 +95,7 @@ export default function PlaceInput({ label, dot, value, onPick, bias, listMax, o
       </div>
       <AnimatePresence>
         {focused && !open && !q.trim() && quick && quick.length > 0 && (
-          <motion.ul
+          <motion.ul data-sheet-scroll
             initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             className="absolute z-30 mt-1 w-full overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel2 shadow-2xl"
             style={{ maxHeight: listMax, touchAction: "pan-y" }}
@@ -114,7 +114,7 @@ export default function PlaceInput({ label, dot, value, onPick, bias, listMax, o
           </motion.ul>
         )}
         {open && (searching || searched || results.length > 0) && (
-          <motion.ul
+          <motion.ul data-sheet-scroll
             initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             className="absolute z-30 mt-1 w-full overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel2 shadow-2xl"
             style={{ maxHeight: listMax, touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}

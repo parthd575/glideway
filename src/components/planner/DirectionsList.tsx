@@ -17,7 +17,7 @@ export default function DirectionsList({ route, color }: { route: ScoredRoute; c
         <ChevronDown size={16} className={`text-dim transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <ol className="max-h-72 divide-y divide-line overflow-y-auto overscroll-contain border-t border-line" style={{ touchAction: "pan-y" }}>
+        <ol data-sheet-scroll className="max-h-72 divide-y divide-line overflow-y-auto overscroll-contain border-t border-line" style={{ touchAction: "pan-y" }}>
           {steps.map((s, i) => (
             <li key={i} className="flex items-center gap-3 px-3.5 py-2.5">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-field" style={{ color }}><ManeuverIcon icon={stepIcon(s)} size={16} /></span>
