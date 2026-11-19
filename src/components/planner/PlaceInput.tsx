@@ -19,6 +19,9 @@ interface Props {
   listMax?: number;
   /** show a "use my location" button */
   onLocate?: () => Promise<void>;
+  locateLabel?: string;
+  /** show an X that clears the field */
+  clearable?: boolean;
   onRemove?: () => void;
   /** saved and recent places offered when the field is focused and empty */
   quick?: QuickPick[];
@@ -26,7 +29,7 @@ interface Props {
   onSave?: (kind: PlaceKind, place: Place) => void;
 }
 
-export default function PlaceInput({ label, dot, value, onPick, bias, listMax, onLocate, onRemove, quick, onSave }: Props) {
+export default function PlaceInput({ label, dot, value, onPick, bias, listMax, onLocate, locateLabel = "Use my current location", clearable, onRemove, quick, onSave }: Props) {
   const [q, setQ] = useState(value?.label ?? "");
   const [results, setResults] = useState<Place[]>([]);
   const [open, setOpen] = useState(false);
@@ -35,6 +38,7 @@ export default function PlaceInput({ label, dot, value, onPick, bias, listMax, o
   const [locating, setLocating] = useState(false);
   const [focused, setFocused] = useState(false);
   const [saveMenu, setSaveMenu] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const abort = useRef<AbortController>(undefined);
 
@@ -55,6 +59,14 @@ export default function PlaceInput({ label, dot, value, onPick, bias, listMax, o
     }, 250);
   };
 
+  const clear = () => {
+    clearTimeout(timer.current);
+    abort.current?.abort();
+    setQ(""); setResults([]); setOpen(false); setSearching(false); setSearched(false);
+    onPick(null);
+    inputRef.current?.focus();
+  };
+
   const locate = async () => {
     if (!onLocate || locating) return;
     setLocating(true);
@@ -66,7 +78,7 @@ export default function PlaceInput({ label, dot, value, onPick, bias, listMax, o
       <div className="flex items-center gap-2.5 rounded-xl border border-line bg-field px-3 py-2.5 focus-within:border-soft/50">
         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: dot }} />
         <input
-          value={q} onChange={(e) => onChange(e.target.value)}
+          ref={inputRef} value={q} onChange={(e) => onChange(e.target.value)}
           onFocus={() => { setFocused(true); if (results.length || searching) setOpen(true); }} onBlur={() => { setTimeout(() => { setOpen(false); setFocused(false); }, 150); }}
           placeholder={label} aria-label={label} autoComplete="off"
           className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-dim"
@@ -85,9 +97,12 @@ export default function PlaceInput({ label, dot, value, onPick, bias, listMax, o
           </div>
         )}
         {onLocate && (
-          <button type="button" onClick={locate} aria-label="Use my current location" title="Use my current location" className="shrink-0 rounded-md p-1 text-emerald-500 transition hover:bg-emerald-500/10">
+          <button type="button" onClick={locate} aria-label={locateLabel} title={locateLabel} className="shrink-0 rounded-md p-1 text-emerald-500 transition hover:bg-emerald-500/10">
             {locating ? <Loader2 size={16} className="animate-spin" /> : <Crosshair size={16} />}
           </button>
+        )}
+        {clearable && !onRemove && (q.length > 0 || !!value) && (
+          <button type="button" onClick={clear} aria-label={`Clear ${label}`} title="Clear" className="shrink-0 rounded-md p-1 text-dim transition hover:bg-line hover:text-ink"><X size={15} /></button>
         )}
         {onRemove && (
           <button type="button" onClick={onRemove} aria-label={`Remove ${label}`} className="shrink-0 rounded-md p-1 text-dim transition hover:bg-line hover:text-ink"><X size={15} /></button>

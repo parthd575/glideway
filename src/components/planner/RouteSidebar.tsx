@@ -99,11 +99,11 @@ export default function RouteSidebar(p: Props) {
       </div>
 
       <div className="space-y-2">
-        <PlaceInput label="Starting point" dot="#34d399" value={p.from} onPick={p.setFrom} listMax={listMax} onLocate={p.onLocateFrom} quick={p.quick} onSave={p.onSavePlace} />
+        <PlaceInput label="Starting point" dot="#34d399" value={p.from} onPick={p.setFrom} listMax={listMax} onLocate={p.onLocateFrom} clearable quick={p.quick} onSave={p.onSavePlace} />
         {p.stops.map((s, i) => (
           <PlaceInput key={i} label={`Stop ${i + 1}`} dot="#f59e0b" value={s} onPick={(v) => setStop(i, v)} onRemove={() => removeStop(i)} listMax={listMax} quick={p.quick} onSave={p.onSavePlace} bias={p.from ? { lat: p.from.lat, lng: p.from.lng } : undefined} />
         ))}
-        <PlaceInput label="Destination" dot="#ef4444" value={p.to} onPick={p.setTo} quick={p.quick} onSave={p.onSavePlace} bias={p.from ? { lat: p.from.lat, lng: p.from.lng } : undefined} listMax={listMax} />
+        <PlaceInput label="Destination" dot="#ef4444" value={p.to} onPick={p.setTo} clearable quick={p.quick} onSave={p.onSavePlace} bias={p.from ? { lat: p.from.lat, lng: p.from.lng } : undefined} listMax={listMax} />
         <div className="flex items-center justify-between">
           <AddStop disabled={p.stops.length >= MAX_STOPS} onAdd={() => p.setStops([...p.stops, null])} count={p.stops.length} />
           <button onClick={p.onSwap} className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-dim transition hover:bg-line hover:text-ink"><ArrowDownUp size={13} /> Swap</button>
@@ -184,7 +184,7 @@ export default function RouteSidebar(p: Props) {
         <>
           <div className="absolute inset-x-3 top-3 z-30 flex items-start gap-2 pt-[env(safe-area-inset-top)]">
             <div className="glass min-w-0 flex-1 rounded-2xl p-2 shadow-2xl">
-              <PlaceInput label="Where to?" dot="#ef4444" value={p.to} onPick={(v) => { p.setTo(v); if (v) setSnap("peek"); }} bias={p.from ? { lat: p.from.lat, lng: p.from.lng } : undefined} quick={p.quick} listMax={Math.max(160, vh - 200)} />
+              <PlaceInput label="Where to?" dot="#ef4444" value={p.to} onPick={(v) => { p.setTo(v); if (v) setSnap("peek"); }} bias={p.from ? { lat: p.from.lat, lng: p.from.lng } : undefined} quick={p.quick} clearable onLocate={p.onLocateFrom} locateLabel="Use my location as the start point" listMax={Math.max(160, vh - 200)} />
             </div>
             <button type="button" onClick={() => setSnap("peek")} aria-label="Show the route planner" className="glass grid h-14 w-12 shrink-0 place-items-center rounded-2xl text-soft shadow-2xl hover:text-ink"><ChevronUp size={20} /></button>
           </div>
